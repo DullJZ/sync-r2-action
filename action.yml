@@ -61,9 +61,11 @@ runs:
     - name: 运行 rclone ${{ inputs.sync_mode }}
       shell: bash
       run: |
-        INCLUDE_FLAGS=""
-        for pattern in ${{ inputs.include_filter }}; do
-          INCLUDE_FLAGS="$INCLUDE_FLAGS --include \"$pattern\""
+        INCLUDE_FLAGS=()
+        
+        IFS=' ' read -r -a patterns <<< "${{ inputs.include_filter }}"
+        for pattern in "${patterns[@]}"; do
+          INCLUDE_FLAGS+=("--include=$pattern")
         done
 
         R2_DEST_FULL_PATH="r2:${{ inputs.r2_bucket_name }}"
@@ -79,7 +81,7 @@ runs:
           "${{ inputs.source_dir }}" \
           "$R2_DEST_FULL_PATH" \
           ${{ inputs.rclone_flags }} \
-          $INCLUDE_FLAGS
+          "${INCLUDE_FLAGS[@]}"
         set +x
 
 branding:
