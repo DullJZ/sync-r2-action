@@ -26,7 +26,7 @@ inputs:
   include_filter:
     description: '空格分隔的 rclone include 过滤器模式列表 (例如："*.jpg *.png")。'
     required: false # 可选
-    default: '*.jpg *.jpeg *.png *.gif *.svg *.webp'
+    default: '*.jpg *.jpeg *.png *.gif *.svg *.webp *.JPG *.JPEG *.PNG *.GIF *.SVG *.WEBP'
   sync_mode:
     description: '操作模式："copy" 或 "sync"。"sync" 会删除目标中多余的文件，"copy" 只添加/更新文件。'
     required: false # 可选
