@@ -1,0 +1,87 @@
+name: '通过 rclone 同步文件到 Cloudflare R2'
+description: '使用 rclone 将工作空间中指定的文件同步或复制到 Cloudflare R2。'
+author: 'DullJZ'
+
+inputs:
+  r2_access_key_id:
+    description: 'Cloudflare R2 Access Key ID。'
+    required: true # 必填
+  r2_secret_access_key:
+    description: 'Cloudflare R2 Secret Access Key。'
+    required: true # 必填
+  r2_endpoint:
+    description: 'Cloudflare R2 Endpoint URL (例如：https://<ACCOUNT_ID>.r2.cloudflarestorage.com)。'
+    required: true # 必填
+  r2_bucket_name:
+    description: 'Cloudflare R2 存储桶的名称。'
+    required: true # 必填
+  source_dir:
+    description: '仓库工作空间内要同步的源目录。'
+    required: false # 可选
+    default: '.'
+  destination_dir:
+    description: 'R2 存储桶内的目标目录（前缀）。留空则表示根目录。'
+    required: false # 可选
+    default: ''
+  include_filter:
+    description: '空格分隔的 rclone include 过滤器模式列表 (例如："*.jpg *.png")。'
+    required: false # 可选
+    default: '*.jpg *.jpeg *.png *.gif *.svg *.webp'
+  sync_mode:
+    description: '操作模式："copy" 或 "sync"。"sync" 会删除目标中多余的文件，"copy" 只添加/更新文件。'
+    required: false # 可选
+    default: 'copy'
+  rclone_flags:
+    description: '直接传递给 rclone 命令的附加标志 (例如：--dry-run --verbose)。'
+    required: false # 可选
+    default: '--progress' # 默认显示进度
+
+runs:
+  using: "composite"
+  steps:
+    - name: 安装 rclone
+      shell: bash
+      run: |
+        sudo apt-get update && sudo apt-get install -y rclone || echo "rclone 可能已安装，或者操作系统不是 Debian/Ubuntu"
+
+    - name: 配置 rclone for R2
+      shell: bash
+      run: |
+        mkdir -p ~/.config/rclone
+        cat << EOF > ~/.config/rclone/rclone.conf
+        [r2]
+        type = s3
+        provider = Cloudflare
+        access_key_id = ${{ inputs.r2_access_key_id }}
+        secret_access_key = ${{ inputs.r2_secret_access_key }}
+        endpoint = ${{ inputs.r2_endpoint }}
+        # region = auto # 通常不需要或设为 auto
+        EOF
+
+    - name: 运行 rclone ${{ inputs.sync_mode }}
+      shell: bash
+      run: |
+        INCLUDE_FLAGS=""
+        for pattern in ${{ inputs.include_filter }}; do
+          INCLUDE_FLAGS="$INCLUDE_FLAGS --include \"$pattern\""
+        done
+
+        R2_DEST_FULL_PATH="r2:${{ inputs.r2_bucket_name }}"
+        if [[ -n "${{ inputs.destination_dir }}" ]]; then
+          CLEAN_DEST_DIR=$(echo "${{ inputs.destination_dir }}" | sed 's:/*$::' | sed 's:^/*::')
+          if [[ -n "$CLEAN_DEST_DIR" ]]; then
+             R2_DEST_FULL_PATH="$R2_DEST_FULL_PATH/$CLEAN_DEST_DIR/"
+          fi
+        fi
+
+        set -x 
+        rclone ${{ inputs.sync_mode }} \
+          "${{ inputs.source_dir }}" \
+          "$R2_DEST_FULL_PATH" \
+          ${{ inputs.rclone_flags }} \
+          $INCLUDE_FLAGS
+        set +x
+
+branding:
+  icon: 'upload-cloud'
+  color: 'orange'
